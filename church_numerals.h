@@ -21,83 +21,153 @@
 
 #include <functional>
 
-namespace Church{
+namespace Church {
 
-    template<typename R>
-    using church_number_func_t = std::function<R(R)>;
-
-    template<typename R>
-    using church_number_t = std::function<church_number_func_t<R>(church_number_func_t<R>)>;
-
-    using church_number_func_t_void = std::function<void()>;
-    using church_number_t_void = std::function<church_number_func_t_void(church_number_func_t_void)>;
-
-    template<typename R>
-    auto church_one = church_number_t<R>([](church_number_func_t<R> f)->church_number_func_t<R>{
-        return [f](R x)->R{
-            return f(x);
+    constexpr auto church_true = [](auto&& first) constexpr{
+        return [&](auto&&) constexpr {
+            return first;
         };
-    });
+    };//logic true
 
-    template<>
-    auto church_one<void> = church_number_t_void([](church_number_func_t_void f)->church_number_func_t_void{
-        return [f]()->void{
-            return f();
+    constexpr auto church_false = [](auto&&) constexpr{
+        return [](auto&& second) constexpr {
+            return second;
         };
-    });
+    };//logic false
 
-    template<typename R>
-    auto church_zero = church_number_t<R>([](church_number_func_t<R> f)->church_number_func_t<R>{
-        return [f](R x)->R{
-            return x;
+    constexpr auto church_and = [](auto&& lboolean) constexpr {
+        return [&](auto&& rboolean) constexpr{
+            return lboolean(rboolean)(lboolean);
         };
-    });
+    };//logic and
 
-    template<>
-    auto church_zero<void> = church_number_t_void([](church_number_func_t_void f)->church_number_func_t_void{
-        return [f]()->void{
-            ;
+    constexpr auto church_or = [](auto&& lboolean) constexpr {
+        return [&](auto&& rboolean) constexpr{
+            return lboolean(lboolean)(rboolean);
         };
-    });
+    };//logic or 
 
-    template<typename R>
-    constexpr church_number_t<R> church_add(church_number_t<R> first,church_number_t<R> second){
-        return [first,second](church_number_func_t<R> f)->church_number_func_t<R>{
-            return [f,first,second](R x)->R{
-                return first(f)(second(f)(x)); 
+    constexpr auto church_not = [](auto&& boolean) constexpr{
+        return boolean(church_false)(church_true);
+    };//logic not
+
+    constexpr auto church_xor = [](auto&& lboolean) constexpr {
+        return [&](auto&& rboolean) constexpr{
+            return lboolean(church_not(rboolean))(rboolean);
+        };
+    };//logic xor
+
+    constexpr auto church_if = [](auto&& boolean) constexpr {
+        return [&](auto&& thenclause) constexpr {
+            return [&](auto&& elseclause) constexpr {
+                return boolean(thenclause,elseclause);
             };
         };
-    }
+    };//if-then-else clause
 
-    template<typename R>
-    constexpr church_number_t<R> church_mult(church_number_t<R> first,church_number_t<R> second){
-        return [first,second](church_number_func_t<R> f)->church_number_func_t<R>{
-            return [f,first,second](R x)->R{
-                return first(second(f))(x); 
+    constexpr auto church_one = [](auto&& f) constexpr {
+        return [=](auto&&... params) constexpr {
+            static_assert(sizeof...(params)<=1,"parameters exceed limit");
+            return f(params...);
+        }; 
+    };//church numeral one
+
+    constexpr auto church_zero = [](auto&&) constexpr {
+        return [](auto&&... params) constexpr {
+            static_assert(sizeof...(params)<=1,"parameters exceed limit");
+            if constexpr(sizeof...(params)==0){
+                return;
+            }
+            else {
+                constexpr auto retval = std::get<0>(std::make_tuple(params...));
+                return retval;
+            }
+        };
+    };//church numeral zero
+
+    constexpr auto church_succ = [](auto&& num) constexpr {
+        return [=](auto&& f) constexpr{
+            return [=](auto&&... params) constexpr {
+                if constexpr(sizeof...(params)!=0)
+                    return f(num(f)(params...));
+                else{
+                    f();
+                    num(f)();
+                }
             };
         };
-    }
+    };//church successor
 
-    template<typename R>
-    constexpr church_number_t<R> church_pred(church_number_t<R> num){
-        return [num](church_number_func_t<R> f)->church_number_func_t<R>{
-            return [num,f](R x)->R{
+    constexpr auto church_add = [](auto&& first,auto&& second) constexpr {
+        return [=](auto&& f) constexpr {
+            return [=](auto&&... params) constexpr {
+                if constexpr(sizeof...(params)!=0)
+                    return first(f)(second(f)(params...));
+                else{
+                    first(f)();
+                    second(f)();
+                }
+            };
+        };
+    };//numeral add
+
+    constexpr auto church_mult = [](auto&& first,auto&& second) constexpr {
+        return [=](auto&& f) constexpr {
+            return [=](auto&&... params) constexpr {
+                return first(second(f))(params...); 
+            };
+        };
+    };//numeral mult
+
+    constexpr auto church_pred = [](auto&& num) constexpr {
+        return [=](auto&& f) constexpr {
+            return [=](auto&&... params) constexpr {
                 bool indicator = true;
 
-                auto pred_func = [&indicator,f](R x)->R{
+                auto pred_func = [&](auto&&... p) constexpr{
                     if (indicator){
                         indicator = false;
-                        return x;
+                        if constexpr(sizeof...(p)==0){
+                            return;
+                        } else{
+                            return std::get<0>(std::make_tuple(p...));
+                        }
                     } 
-                    return f(x);
+                    return f(p...);
                 };
 
-                auto retval = num(pred_func)(x);
+                auto retval = num(pred_func)(params...);
                 return retval;
             };
         };
-    }
+    };//numeral predecessor
 
+    constexpr auto church_minus = [](auto&& first,auto&& second) constexpr {
+        return second(church_pred)(first);
+    };//numeral substraction
+
+    //constexpr auto church_expo = [](auto&& first,auto&& second) constexpr {
+        //return second(first);
+    //};//numeral exponentiation,i.e first^second
+
+    constexpr auto church_iszero = [](auto&& num) constexpr {
+        constexpr auto test_func = [](auto&&) constexpr->decltype(church_false){
+            return church_false;
+        };
+
+        return num(test_func)(church_true);
+    };//is zero
+
+    constexpr auto church_leq = [](auto&& first,auto&& second) constexpr {
+        return church_iszero(church_minus(first,second));
+    };//less than or equal
+
+    constexpr auto church_eq = [](auto&& first,auto&& second) constexpr {
+        return church_and(church_leq(first,second))(church_leq(second,first));
+    };//equal
+
+    //YOU CAN WRITE YOUR OWN IMPL OF LESSTHAN .etc LIKE THIS,SO HERE IGNORED
+    
 }//namespace Church
 
 #endif
