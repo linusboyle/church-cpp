@@ -14,7 +14,7 @@ inline int foo(int x){
 }
 
 int main(){
-    auto One = Church::church_one<int>;
+    auto One = Church::church_one;
 
     auto Two = Church::church_add(One,One);
     auto Four = Church::church_add(Two,Two);
