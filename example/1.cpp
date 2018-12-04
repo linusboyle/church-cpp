@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-inline int foo(int x){
+inline int foo(int x) {
     std::cout<<"hello"<<x<<std::endl; 
     return x+1;
 }
