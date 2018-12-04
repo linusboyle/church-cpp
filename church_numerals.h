@@ -104,8 +104,8 @@ namespace Church {
                 if constexpr(sizeof...(params)!=0)
                     return first(f)(second(f)(params...));
                 else{
-                    first(f)();
-                    second(f)();
+                    first(f)(params...);
+                    second(f)(params...);
                 }
             };
         };
